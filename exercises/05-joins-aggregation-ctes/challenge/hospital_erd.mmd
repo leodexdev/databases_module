@@ -1,0 +1,97 @@
+erDiagram
+    direction LR
+    patient ||--o{ case : "patient_id"
+    case ||--o{ episode : "case_id"
+    case ||--o{ finance : "case_id"
+    finance ||--o{ insurance_finance : "finance_id"
+    insurance ||--o{ insurance_finance : "insurance_id"
+    unit ||--o{ medic_unit : "unit_id"
+    finance ||--o{ report : "finance_id"
+    patient ||--o{ report : "patient_id"
+    staff ||--o{ report : "staff_id"
+    medic_unit ||--o{ room : "medic_unit_id"
+    medic_unit ||--o{ shift : "medic_unit_id"
+    staff ||--o{ shift : "staff_id"
+    episode ||--o{ staff_episode : "episode_id"
+    staff ||--o{ staff_episode : "staff_id"
+    case {
+        integer id PK
+        text content
+        timestamp_with_time_zone created_at
+        timestamp_with_time_zone closed_at
+        numeric value
+        integer patient_id FK
+    }
+    episode {
+        integer id PK
+        text content
+        integer case_id FK
+    }
+    finance {
+        integer id PK
+        integer nif
+        numeric value
+        timestamp_with_time_zone created_at
+        integer case_id FK
+    }
+    insurance {
+        integer id PK
+        text name
+    }
+    insurance_finance {
+        integer id PK
+        integer insurance_id FK
+        integer finance_id FK
+    }
+    medic_unit {
+        integer id PK
+        text name
+        integer unit_id FK
+    }
+    patient {
+        integer id PK
+        text name
+        text surname
+        date date_of_birth
+        integer nif
+        text contact
+    }
+    report {
+        integer id PK
+        integer staff_id FK
+        integer patient_id FK
+        integer finance_id FK
+    }
+    room {
+        integer id PK
+        text name
+        integer medic_unit_id FK
+    }
+    shift {
+        integer id PK
+        timestamp_with_time_zone start_at
+        timestamp_with_time_zone finish_at
+        integer medic_unit_id FK
+        integer staff_id FK
+    }
+    staff {
+        integer id PK
+        text name
+        text surname
+        date date_of_birth
+        text contact
+        text role
+    }
+    staff_episode {
+        integer id PK
+        integer staff_id FK
+        integer episode_id FK
+    }
+    unit {
+        integer id PK
+        text name
+        text street
+        text postal_code
+        text city
+        text country
+    }
