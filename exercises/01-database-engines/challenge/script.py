@@ -1,15 +1,24 @@
-#Imports
-import os
-import sys
 import json
-from pathlib import Path
-from dotenv import load_dotenv, find_dotenv
-import pyscopg2
+import os
+from multiprocessing import Pool
+import psycopg2
 
 
-#Variables
-process_number = 10
-record_number = 1000
-JSON_PATH = Path(__file__).parent / "jsonChallenge1.json"
-env_path = find_dotend(raise_error_if_not_found=True)
-load_dotenv(env_path)
+JSON_FILE = os.path.join(os.path.dirname(__file__), "challenge1.json")
+N_RECORDS = 1000
+
+#check if the file exist, if not, will create one
+def create_file():
+    if not os.path.exists(JSON_FILE):
+        with open(JSON_FILE, "w") as file:
+            json.dump([], file)
+
+def process_work(process_id):
+    for n in range(N_RECORDS):
+        try:
+            with open(JSON_FILE) as file:
+                data = json.load(file)
+        except json.JSONDecodeError:
+            continue
+        data.append({"process": process_id, "number": number})
+
