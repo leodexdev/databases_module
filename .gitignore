@@ -28,3 +28,5 @@ src/generated/
 # Some global git excludes files ignore these; the projects need them committed.
 !lib/
 !*.sql
+
+Makefile
