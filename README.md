@@ -663,10 +663,6 @@ Folder: `exercises/05-queries/queries.sql`
 
 10 business questions on Pagila. Examples: revenue per category per month; top 5 customers per store; films never rented; pairs of actors who appeared in more than 3 films together (self join); customers who spend more than the average of their city.
 
-Marked 2 for 9 or 10 correct, 1 for 5 to 8.
-
-Group project: finish the seed with the scenario's volume. Milestone M1 closes at the end of this session.
-
 ### Challenge
 
 Using a recursive CTE (`WITH RECURSIVE`), compute the "degrees of separation" between actors: two actors are at distance 1 if they appeared in the same film. Given one actor, list every actor reachable within 3 degrees and the shortest distance to each. Make sure the query terminates and does not revisit actors.
@@ -752,10 +748,6 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY daily_rentals;
 Folder: `exercises/06-window/queries.sql`
 
 Top 3 films per category (ties handled); cumulative revenue per day; change compared with the previous month; each customer's position in their store's ranking; a materialised view of monthly revenue with refresh.
-
-Marked 2 when all are correct and ties are handled.
-
-Group project: at least 6 business queries for your scenario in `docs/queries.md`, each with the question it answers.
 
 ### Challenge
 
@@ -851,10 +843,6 @@ Compare the time with and without the indexes. Record each case as: query, plan 
 Folder: `exercises/07-indexes/README.md`
 
 The script in the exercise folder creates a 2-million-row rental table. For each of the 5 queries: plan before, index created, plan after, times, and one sentence explaining the difference. Not every query can be fixed with an index; when one cannot, prove it with the plans and explain why.
-
-Marked 2 when all 5 have evidence and any case an index cannot fix is correctly identified.
-
-Group project: three slow queries from your scenario, the indexes you created, and before/after measurements in `docs/optimisation.md`.
 
 ### Challenge
 
@@ -972,10 +960,6 @@ Folder: `exercises/08-transactions/`
 3. Cause a deadlock and explain the PostgreSQL message.
 4. Write skew. Rule: every store keeps at least one active staff member. Add staff so that store 1 has 20 active members. A Python script sends 20 simultaneous requests, each deactivating a different member after checking the count of active staff. Show the rule broken under `READ COMMITTED`, then fix it with `SERIALIZABLE` and retries, and prove that exactly one member stays active.
 
-Marked 2 when all four points are done and the script proves the result.
-
-Group project: the critical transactions of your scenario in SQL, and the first version of the concurrency test in `tests/concurrency/`.
-
 ### Challenge
 
 Build a job queue in PostgreSQL: a `job` table, a producer that inserts 10,000 jobs, and 8 worker processes that claim jobs with `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 1`, process them and mark them done. Prove that every job was processed exactly once. Then kill a worker halfway through a job and show what happens to that job.
@@ -1090,10 +1074,6 @@ Folder: `exercises/09-security/`
 2. The mini-API in `exercises/09-security/vulnerable-api/` is vulnerable to SQL injection. Run it locally, document the payload that exploits it, and fix the code.
 3. A Redis ACL user that can `GET` and `SET` but cannot `FLUSHALL`.
 
-Marked 2 when all three points have proof.
-
-Group project: PostgreSQL roles, MongoDB and Redis users, review of all queries and secrets, `docs/security.md`.
-
 ### Challenge
 
 Add row-level security to Pagila so that a connection can only see the rentals and payments of one customer. The application sets the customer with `SET app.customer_id = '42'` at the start of each request, and the policy uses `current_setting('app.customer_id')`. Prove that a query without a `WHERE` returns only that customer's rows, and that the `app` role cannot bypass the policy.
@@ -1176,10 +1156,6 @@ A runbook entry should include: when to use it, prerequisites, exact commands, h
 Folder: `exercises/10-backup/runbook.md`
 
 At the start, back up your Pagila. Halfway through, the trainer runs a script that deletes data from 3 tables. Recover the data and document: the commands used, the measured restore time, what was lost between the backup and the disaster (real RPO), and what you would change in your strategy.
-
-Marked 2 when the data is recovered and the runbook is clear enough for someone else to follow.
-
-Group project: backup and restore of your scenario's PostgreSQL. Milestone M2 closes at the end of this session.
 
 ### Challenge
 
