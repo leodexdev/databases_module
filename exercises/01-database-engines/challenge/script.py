@@ -34,7 +34,6 @@ ROOT = Path(__file__).resolve().parent
 
 
 def load_env():
-    """Load KEY=VALUE lines from the .env in the project root (real env vars win)."""
     env_file = ROOT / ".env"
     if not env_file.is_file():
         return
@@ -54,7 +53,7 @@ PG = dict(
     user=os.getenv("POSTGRES_USER", "postgres"),
     password=os.getenv("POSTGRES_PASSWORD", "change-me-postgres"),
 )
-DB_NAME = "race_demo"
+DB_NAME = "01_challenge"
 
 
 def status(code, message):
@@ -63,7 +62,6 @@ def status(code, message):
 
 
 def delete_json():
-    """Delete the JSON file (no error if it is already gone)."""
     try:
         path = Path(JSON_FILE)
         if path.exists():
@@ -78,7 +76,6 @@ def delete_json():
 
 
 def cooldown_then_delete(seconds):
-    """Wait `seconds` (with a countdown), then delete the JSON file."""
     print(f"\nCooldown: deleting {JSON_FILE} in {seconds}s (Ctrl+C to cancel)")
     try:
         for remaining in range(seconds, 0, -1):
@@ -91,9 +88,7 @@ def cooldown_then_delete(seconds):
     delete_json()
 
 
-# --------------------------------------------------------------------------
-# Part 1: JSON file, no locking
-# --------------------------------------------------------------------------
+#JSON
 def json_worker(worker_id, barrier):
     barrier.wait()  # all processes start at the same moment
     for i in range(N_RECORDS):
@@ -135,14 +130,11 @@ def run_json_test():
     return count
 
 
-# --------------------------------------------------------------------------
-# Part 2: PostgreSQL, 10 concurrent connections
-# --------------------------------------------------------------------------
+#POSTGRE
 def setup_database():
     import psycopg2
     from psycopg2 import sql
 
-    # 1) create the database if missing (needs autocommit, connect to 'postgres')
     admin = psycopg2.connect(dbname="postgres", **PG)
     admin.autocommit = True
     with admin.cursor() as cur:
@@ -154,7 +146,6 @@ def setup_database():
             status(200, f"Database '{DB_NAME}' created")
     admin.close()
 
-    # 2) create a fresh table
     conn = psycopg2.connect(dbname=DB_NAME, **PG)
     with conn, conn.cursor() as cur:
         cur.execute("DROP TABLE IF EXISTS records")
