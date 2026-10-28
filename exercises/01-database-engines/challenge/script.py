@@ -16,6 +16,8 @@ Options:
   --delete               only delete 01_challenge.json and exit
   --auto-delete SECONDS  cooldown before deleting the JSON file after the run (default 30, 0 = off)
   --no-delete            keep the JSON file after the run
+  --sequential           run the workers one at a time instead of concurrently
+                         (no race: shows the JSON approach is only unsafe under concurrency)
 """
 import argparse
 import json
@@ -28,10 +30,24 @@ from pathlib import Path
 N_PROCS = 10
 N_RECORDS = 1000
 EXPECTED = N_PROCS * N_RECORDS
-JSON_FILE = "01_challenge.json"
-
-ROOT = Path(__file__).resolve().parent
-
+CHALLENGE_REL = Path("exercises/01-database-engines/challenge")
+ 
+ 
+def find_root():
+    """Project root = first directory (walking up from the script and from the
+    current directory) that contains exercises/01-database-engines/challenge.
+    Works the same whether run from the root or from the challenge folder."""
+    script_dir = Path(__file__).resolve().parent
+    for start in (script_dir, Path.cwd().resolve()):
+        for p in (start, *start.parents):
+            if (p / CHALLENGE_REL).is_dir():
+                return p
+    return script_dir  # fallback
+ 
+ 
+ROOT = find_root()
+CHALLENGE_DIR = ROOT / CHALLENGE_REL
+JSON_FILE = CHALLENGE_DIR / "01_challenge.json"
 
 def load_env():
     env_file = ROOT / ".env"
@@ -88,6 +104,25 @@ def cooldown_then_delete(seconds):
     delete_json()
 
 
+def run_workers(target, sequential):
+    """Run N_PROCS workers. Concurrent: all start together behind a barrier.
+    Sequential: one process at a time, each finishing before the next starts."""
+    # In sequential mode every worker is alone, so its barrier only needs 1 party.
+    barrier = mp.Barrier(1 if sequential else N_PROCS)
+    procs = [mp.Process(target=target, args=(w, barrier)) for w in range(N_PROCS)]
+    t0 = time.time()
+    if sequential:
+        for p in procs:
+            p.start()
+            p.join()
+    else:
+        for p in procs:
+            p.start()
+        for p in procs:
+            p.join()
+    return procs, time.time() - t0
+
+
 #JSON
 def json_worker(worker_id, barrier):
     barrier.wait()  # all processes start at the same moment
@@ -102,20 +137,14 @@ def json_worker(worker_id, barrier):
             json.dump(data, f)
 
 
-def run_json_test():
-    print("\n=== Part 1: JSON file (read -> append -> write back, no lock) ===")
+def run_json_test(sequential=False):
+    mode = "one process at a time" if sequential else "concurrent, no lock"
+    print(f"\n=== Part 1: JSON file (read -> append -> write back, {mode}) ===")
     with open(JSON_FILE, "w") as f:
         json.dump([], f)
     status(200, f"Created {JSON_FILE} (empty list)")
 
-    barrier = mp.Barrier(N_PROCS)
-    procs = [mp.Process(target=json_worker, args=(w, barrier)) for w in range(N_PROCS)]
-    t0 = time.time()
-    for p in procs:
-        p.start()
-    for p in procs:
-        p.join()
-    elapsed = time.time() - t0
+    _, elapsed = run_workers(json_worker, sequential)
 
     try:
         with open(JSON_FILE) as f:
@@ -171,8 +200,9 @@ def db_worker(worker_id, barrier):
     conn.close()
 
 
-def run_db_test():
-    print("\n=== Part 2: PostgreSQL (10 concurrent connections) ===")
+def run_db_test(sequential=False):
+    mode = "one connection at a time" if sequential else f"{N_PROCS} concurrent connections"
+    print(f"\n=== Part 2: PostgreSQL ({mode}) ===")
     try:
         import psycopg2
     except ImportError:
@@ -186,14 +216,7 @@ def run_db_test():
                     f"{PG['host']}:{PG['port']}: {e}".strip())
         return None
 
-    barrier = mp.Barrier(N_PROCS)
-    procs = [mp.Process(target=db_worker, args=(w, barrier)) for w in range(N_PROCS)]
-    t0 = time.time()
-    for p in procs:
-        p.start()
-    for p in procs:
-        p.join()
-    elapsed = time.time() - t0
+    procs, elapsed = run_workers(db_worker, sequential)
 
     if any(p.exitcode != 0 for p in procs):
         status(500, "One or more worker connections failed")
@@ -222,14 +245,17 @@ def main():
                         help="after the run, wait SECONDS (default 30, 0 = off) then delete the JSON file")
     parser.add_argument("--no-delete", action="store_true",
                         help="keep the JSON file after the run")
+    parser.add_argument("--sequential", action="store_true",
+                        help="run the workers one at a time instead of concurrently")
     args = parser.parse_args()
 
     if args.delete:
         sys.exit(0 if delete_json() else 1)
 
-    print(f"Race demo: {N_PROCS} processes x {N_RECORDS:,} records = {EXPECTED:,} expected")
-    json_count = run_json_test()
-    db_count = run_db_test()
+    how = "sequentially (1 at a time)" if args.sequential else "concurrently"
+    print(f"Race demo: {N_PROCS} processes x {N_RECORDS:,} records = {EXPECTED:,} expected, run {how}")
+    json_count = run_json_test(args.sequential)
+    db_count = run_db_test(args.sequential)
 
     print("\n=== Comparison ===")
     print(f"  {'Storage':<14}{'Expected':>10}{'Found':>10}{'Lost':>10}")
