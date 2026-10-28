@@ -30,3 +30,5 @@ src/generated/
 !*.sql
 
 Makefile
+
+exercises/01-database-engines/challenge/01_challenge.json

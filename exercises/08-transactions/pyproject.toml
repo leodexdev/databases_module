@@ -1,0 +1,22 @@
+[project]
+name = "08-transactions"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Leo", email = "235762230+leodexdev@users.noreply.github.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "dotenv>=0.9.9",
+    "psycopg>=3.3.6",
+    "psycopg-binary>=3.3.6",
+    "sqlalchemy>=2.1.6",
+]
+
+[project.scripts]
+08-transactions = "08_transactions:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"

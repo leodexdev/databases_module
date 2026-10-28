@@ -1,2 +1,2 @@
 def main() -> None:
-    print("Hello from workspace!")
+    print("Hello from 08-transactions!")
