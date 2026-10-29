@@ -1,8 +1,3 @@
-select 'create database hospital'
-where not exists (select from pg_database where datname = 'hospital')\gexec
-
-\c hospital
-
 create table patient (
     id serial primary key not null,
     name text not null,
