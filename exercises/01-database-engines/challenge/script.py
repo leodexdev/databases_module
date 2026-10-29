@@ -3,22 +3,7 @@
 # requires-python = ">=3.9"
 # dependencies = ["psycopg2-binary"]
 # ///
-"""
-Run with just:  uv run script.py
 
-  * Dependencies are declared above, so uv installs them automatically.
-  * Credentials are read from the .env file in the project root (next to this
-    script): POSTGRES_USER / POSTGRES_PASSWORD. Optional: POSTGRES_HOST and
-    POSTGRES_PORT (default localhost:5432). Real environment variables take
-    priority over .env.
-
-Options:
-  --delete               only delete 01_challenge.json and exit
-  --auto-delete SECONDS  cooldown before deleting the JSON file after the run (default 30, 0 = off)
-  --no-delete            keep the JSON file after the run
-  --sequential           run the workers one at a time instead of concurrently
-                         (no race: shows the JSON approach is only unsafe under concurrency)
-"""
 import argparse
 import json
 import multiprocessing as mp
@@ -104,37 +89,55 @@ def cooldown_then_delete(seconds):
     delete_json()
 
 
-def run_workers(target, sequential):
-    """Run N_PROCS workers. Concurrent: all start together behind a barrier.
-    Sequential: one process at a time, each finishing before the next starts."""
-    # In sequential mode every worker is alone, so its barrier only needs 1 party.
-    barrier = mp.Barrier(1 if sequential else N_PROCS)
-    procs = [mp.Process(target=target, args=(w, barrier)) for w in range(N_PROCS)]
-    t0 = time.time()
-    if sequential:
-        for p in procs:
-            p.start()
-            p.join()
+def wait_for_turn(worker_id, barrier, turns):
+    """Concurrent: wait at the barrier, then everyone goes together.
+    Sequential: wait until the worker before us says we can go."""
+    if turns:
+        turns[worker_id].wait()
     else:
-        for p in procs:
-            p.start()
-        for p in procs:
-            p.join()
+        barrier.wait()
+
+
+def pass_turn(worker_id, turns):
+    """Sequential only: tell the next worker it can start."""
+    if turns:
+        turns[worker_id + 1].set()
+
+
+def run_workers(target, sequential):
+    """Run N_PROCS workers. All 10 processes are started at the same time.
+    Concurrent: a barrier makes them all write together.
+    Sequential: they queue up. Worker 0 goes first, and when it finishes
+    all its records it lets worker 1 go, and so on."""
+    barrier = mp.Barrier(N_PROCS)
+    # turns[w] is set when it is worker w's turn (one extra at the end, never used)
+    turns = [mp.Event() for _ in range(N_PROCS + 1)] if sequential else None
+    procs = [mp.Process(target=target, args=(w, barrier, turns)) for w in range(N_PROCS)]
+    t0 = time.time()
+    for p in procs:
+        p.start()
+    if sequential:
+        turns[0].set()  # let the first worker go
+    for p in procs:
+        p.join()
     return procs, time.time() - t0
 
 
 #JSON
-def json_worker(worker_id, barrier):
-    barrier.wait()  # all processes start at the same moment
-    for i in range(N_RECORDS):
-        try:
-            with open(JSON_FILE) as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            data = []  # file was caught mid-write by another process
-        data.append({"worker": worker_id, "n": i})
-        with open(JSON_FILE, "w") as f:
-            json.dump(data, f)
+def json_worker(worker_id, barrier, turns):
+    wait_for_turn(worker_id, barrier, turns)
+    try:
+        for i in range(N_RECORDS):
+            try:
+                with open(JSON_FILE) as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, FileNotFoundError):
+                data = []  # file was caught mid-write by another process
+            data.append({"worker": worker_id, "n": i})
+            with open(JSON_FILE, "w") as f:
+                json.dump(data, f)
+    finally:
+        pass_turn(worker_id, turns)  # even if this worker crashes, don't block the queue
 
 
 def run_json_test(sequential=False):
@@ -189,15 +192,18 @@ def setup_database():
     status(200, "Table 'records' created")
 
 
-def db_worker(worker_id, barrier):
+def db_worker(worker_id, barrier, turns):
     import psycopg2
     conn = psycopg2.connect(dbname=DB_NAME, **PG)
     conn.autocommit = True  # one commit per record, like one file write per record
     cur = conn.cursor()
-    barrier.wait()
-    for i in range(N_RECORDS):
-        cur.execute("INSERT INTO records (worker, n) VALUES (%s, %s)", (worker_id, i))
-    conn.close()
+    wait_for_turn(worker_id, barrier, turns)
+    try:
+        for i in range(N_RECORDS):
+            cur.execute("INSERT INTO records (worker, n) VALUES (%s, %s)", (worker_id, i))
+    finally:
+        conn.close()
+        pass_turn(worker_id, turns)
 
 
 def run_db_test(sequential=False):
