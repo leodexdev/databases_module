@@ -28,6 +28,7 @@ erDiagram
         int reader_id PK
         string card_number UK
         string name
+        string surname
         string email UK
         string phone
         string address
@@ -41,12 +42,17 @@ erDiagram
     BOOK {
         string isbn13 PK
         string title
+        string genres
+        int number_of_pages
         int publication_year
         int publisher_id FK
     }
     AUTHOR {
         int author_id PK
         string name
+        string surname
+        int age
+        string email
     }
     BOOK_AUTHOR {
         string isbn13 PK, FK
@@ -183,8 +189,8 @@ So BCNF is stricter. A table can be in 3NF and not in BCNF only when it has over
 |---|---|---|
 | reader | reader_id, card_number, email | each key → all other columns |
 | publisher | publisher_id, name | each key → the other columns |
-| author | author_id | author_id → name |
-| book | isbn13 | isbn13 → title, publication_year, publisher_id |
+| author | author_id | author_id → name, surname, age, email |
+| book | isbn13 | isbn13 → title, genres, number_of_pages, publication_year, publisher_id |
 | book_author | (isbn13, author_id), (isbn13, author_position) | (isbn13, author_id) → author_position, and (isbn13, author_position) → author_id |
 | branch | branch_id, name | each key → the other columns |
 | staff | staff_id, email | each key → the other columns |

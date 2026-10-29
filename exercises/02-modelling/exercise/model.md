@@ -18,6 +18,7 @@ erDiagram
         int reader_id PK
         string card_number UK
         string name
+        string surname
         string email UK
         string phone
         string address
@@ -31,12 +32,17 @@ erDiagram
     BOOK {
         string isbn13 PK
         string title
+        string genres
+        int number_of_pages
         int publication_year
         int publisher_id FK
     }
     AUTHOR {
         int author_id PK
         string name
+        string surname
+        int age
+        string email
     }
     BOOK_AUTHOR {
         string isbn13 PK, FK
@@ -86,10 +92,10 @@ Cardinalities:
 
 | Table | Columns | Primary key | Foreign keys | UNIQUE |
 |---|---|---|---|---|
-| reader | reader_id, card_number, name, email, phone, address, registration_date | reader_id | none | card_number, email |
+| reader | reader_id, card_number, name, surname, email, phone, address, registration_date | reader_id | none | card_number, email |
 | publisher | publisher_id, name, country | publisher_id | none | name |
-| book | isbn13, title, publication_year, publisher_id | isbn13 | publisher_id → publisher | none besides the PK |
-| author | author_id, name | author_id | none | none (two authors can have the same name) |
+| book | isbn13, title, genres, number_of_pages, publication_year, publisher_id | isbn13 | publisher_id → publisher | none besides the PK |
+| author | author_id, name, surname, age, email | author_id | none | none (two authors can have the same name, and the email is optional) |
 | book_author | isbn13, author_id, author_position | (isbn13, author_id) | isbn13 → book, author_id → author | (isbn13, author_position) |
 | copy | copy_id, barcode, isbn13, acquisition_date, copy_condition | copy_id | isbn13 → book | barcode |
 | loan | loan_id, reader_id, copy_id, loan_date, return_date | loan_id | reader_id → reader, copy_id → copy | copy_id, only where return_date is empty |
@@ -100,6 +106,8 @@ Notes:
 
 - `copy_condition` has a CHECK: `new`, `good`, `worn` or `damaged`. `status` in reservation also has a CHECK: `active`, `fulfilled` or `cancelled`.
 - `return_date` and `paid_date` are NULL until they happen.
+- `genres` is one text column, so it holds a single value (for example the main genre). If a book needed several genres in one cell, that would break 1NF and the genres would go in their own table.
+- `age` is stored as given, so it gets out of date every year. A `birth_date` would not, but I kept `age` as in the diagram.
 - The reservation queue for a book is its active reservations ordered by `reserved_at`.
 - `due_date` is not a column of `loan`. It is always `loan_date + 14`, so storing it would make a column depend on another non-key column (`loan_id → loan_date → due_date`), and that breaks 3NF. A view gives it when needed: `SELECT *, loan_date + 14 AS due_date FROM loan`.
 - The publisher's country is in `publisher` and not in `book`, for the same reason.
