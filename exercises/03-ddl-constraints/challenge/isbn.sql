@@ -1,7 +1,6 @@
 -- Challenge 03: the database rejects invalid ISBN-13 values.
 -- Run on an empty database. The DROP lines make the script safe to run again.
 
--- Hide the NOTICE lines from DROP ... IF EXISTS ("does not exist, skipping").
 SET client_min_messages = warning;
 
 DROP TABLE IF EXISTS book;
@@ -45,17 +44,12 @@ INSERT INTO book (isbn, title) VALUES ('978-3-16-148410-0', 'Valid, check digit 
 -- Invalid values: these 4 inserts must fail.
 -- All 4 are rejected by isbn13_check (the CHECK of the domain isbn13).
 
--- Wrong check digit: the last digit should be 7, not 8.
 INSERT INTO book (isbn, title) VALUES ('978-0-306-40615-8', 'Wrong check digit');
 
--- Too short: only 11 digits, an ISBN-13 has 13.
 INSERT INTO book (isbn, title) VALUES ('978-0-306-4061',    'Too short');
 
--- Leading hyphen: a hyphen is only allowed between digits.
 INSERT INTO book (isbn, title) VALUES ('-9780306406157',    'Leading hyphen');
 
--- Two hyphens in a row: a hyphen must have a digit on each side.
 INSERT INTO book (isbn, title) VALUES ('978--0306406157',   'Two hyphens in a row');
 
--- Only the 3 valid books should be in the table.
 SELECT book_id, isbn, title FROM book ORDER BY book_id;
