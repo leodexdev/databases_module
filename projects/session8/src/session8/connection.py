@@ -1,5 +1,7 @@
-from sqlalchemy import Engine,create_engine
 import os
+
+from sqlalchemy import Engine, create_engine
+
 
 def build_connection_string(user, password, host, port, database)-> str:
     """

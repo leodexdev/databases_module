@@ -13,7 +13,7 @@ You will design, build, secure, optimise and recover the databases of a web appl
 - **MongoDB** (documents) for reports that are read often and change shape from case to case
 - **Redis** (in-memory key-value) for rankings, counters and temporary reservations that change many times per second
 
-The exercises use the Pagila sample database (a DVD rental shop) so that every student works on the same data. The group project uses all three engines in a different scenario per group.
+The exercises use the Pagila sample database (a DVD rental shop) so that every student works on the same data. The group project uses all three engines in a different business per group, and is defined in [briefs/](briefs/README.md).
 
 ## Getting started
 
@@ -76,7 +76,7 @@ exercises/
 - Every Python deliverable is a uv project with its own `pyproject.toml` and runs with `uv run`. The connection URLs it needs are in `.env.example`.
 - The briefs use Python (psycopg, SQLAlchemy, Alembic, FastAPI, pymongo, redis-py). You may answer with the stack of one of the session example projects instead (Django ORM and migrations, or Next.js with Prisma and the official MongoDB and Redis drivers), as long as every requirement of the brief is met and the README says how to run it.
 - Never commit `.env`, dumps or `.venv/`.
-- Commit and push before the end of session 19.
+- Commit and push before the end of session 19. The group project has an earlier deadline: its tag must be pushed before session 19 starts (see [briefs/README.md](briefs/README.md#timeline-and-delivery)).
 
 Each brief has the same parts: **Goal**, **Starting point** (what you need before you start, with the commands to create it), **Tasks**, **Deliverables** (the files to submit) and **Done when** (how the answer is checked). When a brief builds on an earlier exercise, the starting point also gives what you need to do it without that exercise.
 
@@ -84,7 +84,7 @@ Challenges for sessions 01 to 07 are mandatory. Challenges from session 08 onwar
 
 Each exercise (sessions 01 to 16) and each mandatory challenge (sessions 01 to 07) is marked 0 (not submitted), 1 (incomplete or with relevant errors) or 2 (complete and correct). Optional challenges are not marked.
 
-Sessions 17 to 19 are dedicated to the group project, which is defined in its own brief.
+Sessions 17 to 19 are dedicated to the group project, which is defined in its own brief: start with [briefs/README.md](briefs/README.md).
 
 ## Sessions
 
@@ -104,8 +104,8 @@ Sessions 17 to 19 are dedicated to the group project, which is defined in its ow
 - [Session 14: MongoDB II, aggregation pipelines and reports](#session-14-mongodb-ii-aggregation-pipelines-and-reports)
 - [Session 15: Redis I, data structures and patterns](#session-15-redis-i-data-structures-and-patterns)
 - [Session 16: Redis II, source of truth, rebuild and persistence](#session-16-redis-ii-source-of-truth-rebuild-and-persistence)
-- [Session 17: Project integration and disaster day](#session-17-project-integration-and-disaster-day)
-- [Session 18: Cross-group review and documentation](#session-18-cross-group-review-and-documentation)
+- [Session 17: Project integration](#session-17-project-integration)
+- [Session 18: Review and documentation](#session-18-review-and-documentation)
 - [Session 19: Delivery and technical discussion](#session-19-delivery-and-technical-discussion)
 
 ---
@@ -2802,82 +2802,114 @@ CREATE TABLE outbox (
 
 ---
 
-## Session 17: Project integration and disaster day
+## Session 17: Project integration
 
 ### Theory
 
-Before delivery, every engine must work together in the scenario's full flows, under load, and survive the loss of any one of them.
+From this session to the end of the module you work on the group project. Sessions 01 to 16 each taught one piece: a constraint, an index, a transaction, a Redis key, a pipeline. The project asks you to put those pieces together in one system for one business, with three engines and an API, and to prove that the system still keeps its rules when many requests arrive at the same moment.
 
-The concurrency tests prove that the business rules hold when many requests arrive at once. Run them against the integrated system (API plus all three engines), not only against SQL.
+Each group of three works on one of three projects: ticketing (A), food delivery (B) or music streaming (C). The rules, the technical requirements and the grading are the same for the three and are in [briefs/README.md](briefs/README.md). Your project's brief describes the business. The delivery is a SemVer tag pushed to your group's repository before session 19 starts.
 
-A runbook is only useful if someone can follow it under pressure without the person who wrote it. Disaster day tests exactly that. The trainer deletes the volume of one engine, chosen on the day, and the group restores it using only the runbook. The real RTO (time to restore) and real RPO (data lost) are recorded and count towards the "Security and Backup/Restore" part of the rubric. The result shows whether the backups are current, the scripts work on a clean volume, and the derived data can be rebuilt.
+The steps below give the order in which to start. Use the first hour of this session for steps 1 and 2.
 
-### Tutorial
+#### 1. Read the two documents, in this order
 
-Go through the delivery checklist in the project brief and mark what is missing.
+Read [briefs/README.md](briefs/README.md) from start to end, then your project's brief. Every member reads both. Do not split the reading between members: in session 19 each member answers for the whole project.
 
-Run the full concurrency test suite with the API running:
+While you read the brief, note the sections that turn directly into work and are checked at the delivery:
 
-```bash
-docker compose up -d
-uv run pytest tests/concurrency -v
-```
+| Section of the brief | What it becomes in your project |
+|----------------------|---------------------------------|
+| Requirements | The PostgreSQL tables (at least 10, in third normal form) |
+| Where the rules are enforced | First list: a constraint, trigger or privilege in PostgreSQL for each rule. Second list: a decision for each rule, written in `docs/postgres.md` |
+| Flows the app must implement | The endpoints of the app. All of them are mandatory |
+| MongoDB collections | The mandatory collections, and your answer to the "You decide" question |
+| Reports (MongoDB) | At least 3 aggregation pipelines |
+| Real-time features (Redis) and Data that expires | The Redis keys, their data structures and their TTLs |
+| Frequent queries (PostgreSQL) | The indexes, and the `EXPLAIN` evidence for at least 3 queries |
+| Seed volumes | What `scripts/seed.sh` loads, in under 5 minutes |
 
-Rehearse the disaster before the trainer runs it. For each engine:
+Write down every question the two documents do not answer and ask the trainer during this session.
 
-```bash
-./scripts/backup.sh
-docker compose stop mongo
-docker compose rm -f mongo
-docker volume rm <project>_mongo_data
-docker compose up -d mongo
-time ./scripts/restore.sh mongo
-```
+#### 2. Set up the repository and the environment
 
-Then check the data with the verification steps from your runbook (row and document counts, a known query, the Redis verification script). Every time you have to do something the runbook does not say, add it to the runbook.
+One member creates the repository on GitHub. It is a new repository, not a fork of this one. Then, before anyone writes code:
 
-### Exercise (group)
+1. Add the other two members as collaborators and give the trainer read access.
+2. Turn off squash merging: Settings, General, Pull Requests, untick "Allow squash merging".
+3. Each member checks `git config user.email` on every machine they will commit from and adds that email to the authors table in the README. Commits made with another email do not count.
+4. Choose the stack (FastAPI with SQLAlchemy and Alembic, Django, or Next.js with Prisma) and write the reason in the README. Pick the one the three members know best. The example projects in `sessions/NN-topic/` exist in all three.
+5. Create the folders listed in [Repository structure](briefs/README.md#repository-structure), a `.gitignore` that includes `.env`, and a `.env.example` with placeholder passwords.
+6. Write `compose.yml` with the three engines, and a first version of `scripts/setup.sh` that creates the project database, the three PostgreSQL roles and the MongoDB user.
 
-Defined in the group project brief.
+Stop the module environment first (`docker compose down` in this repository), because the project uses the same ports.
 
-### Challenge (optional, individual)
+This step is done when each member, on their own machine, can clone the repository and run `cp .env.example .env`, `docker compose up -d` and `./scripts/setup.sh` with no error, even though the database is still empty. A broken environment takes minutes to fix now and can cost the delivery if you find it in the last week.
 
-Folder: `exercises/17-disaster/challenge/`
+#### 3. Design before you write code
 
-**Goal.** Rehearse the loss of a whole engine on your own machine and restore it using only a runbook.
+Do the design as a group, on paper or in a Mermaid file in `docs/`, and agree on it before anyone writes a migration. Renaming a table in the design costs nothing. The same change after three migrations and two endpoints costs an afternoon.
 
-**Starting point.** The databases of earlier exercises: `ex16` in PostgreSQL, `pagila_docs` in MongoDB and the category sets in Redis database 1. If you do not have them, create them with the starting points of exercises 13 and 16.
+1. **Source of truth.** List every kind of data in the brief (customers, orders, holds, logs, charts, ...). For each one, write the engine that owns it, the engines that keep a copy, and what is lost if each engine is lost (session 16). This table goes in `docs/architecture.md`.
+2. **PostgreSQL schema.** Draw the ER diagram from the Requirements section of the brief (session 02). Give each table its primary key, its types and its foreign keys with an `ON DELETE` behaviour (session 03). Next to each rule in the first list of "Where the rules are enforced", write the constraint that enforces it. A rule with nothing written next to it is a gap in the design.
+3. **MongoDB documents.** For each mandatory collection, write one example document and decide what is embedded and what is referenced (session 13). Answer the "You decide" question of your brief.
+4. **Redis keys.** For each real-time feature and each row of "Data that expires", write the key pattern, the data structure, an example value, the TTL and the class of the data: source of truth, derived or ephemeral (sessions 15 and 16).
 
-Deleting a volume deletes every database of that engine, including `pagila` and the databases of all the other exercises and session projects. Do this only after task 1, and reload what you need afterwards (`./scripts/load-pagila.sh`, `./scripts/create-db.sh ...`).
+#### 4. Build the concurrent flow first
 
-**Tasks.**
+The brief is built around the concurrent flow, the demonstration in session 19 runs its test, and it uses PostgreSQL, Redis and the API together. Build it before the other flows, in this order:
 
-1. Write `runbook.md` before the drill: how to back up each engine (`pg_dump` of `ex16`, `mongodump` of `pagila_docs`; Redis holds only derived data and is rebuilt), how to restore each one, and how to verify each restore (row counts, document counts, `verify.py` of exercise 16). Take the backups.
-2. Pick the engine at random:
+1. The migrations for the tables the concurrent flow uses, with their constraints.
+2. A small seed with a few rows per table, enough to call the endpoints by hand. The full volumes come later.
+3. The naive version of each contested endpoint: a read followed by a write, with no lock and no atomic step.
+4. The real version, with the mechanism you chose: a row lock, a conditional `UPDATE`, an isolation level, a constraint or an atomic Redis step (session 08). Run the test again until every run holds the rule with no 5xx.
 
-   ```bash
-   python3 -c "import random; print(random.choice(['postgres', 'mongo', 'redis']))"
-   ```
+`sessions/17-integration-disaster-day/` has, in the three stacks, a small API that uses the three engines and a concurrency test that sends parallel requests to it while it runs. Read it before you write yours. Its rules are different from your project's, but the structure of the test is the same: create the fixture, send the requests at the same moment, count the answers, check the rule in PostgreSQL.
 
-3. Delete its volume and start it empty (replace `<engine>` with the result):
+#### 5. Add the rest of the project
 
-   ```bash
-   docker compose stop <engine>
-   docker compose rm -f <engine>
-   docker volume rm databases-module_<engine>_data
-   docker compose up -d <engine>
-   ```
+With the concurrent flow working, add the other parts one at a time. Merge each one, and check that it runs from a clean clone, before you start the next.
 
-4. Restore it following only `runbook.md`, timing every step. Each time you need something the runbook does not say, write it down and add it to the runbook afterwards.
-5. Repeat tasks 3 and 4 for the other two engines.
+| Part of the project | Sessions to revisit |
+|---------------------|---------------------|
+| The other mandatory flows | 05 and 06 (queries), 11 and 12 (ORM, migrations, API) |
+| Redis features, rebuild and verify scripts, cache evidence | 15 and 16 |
+| MongoDB collections, validators, TTL indexes, report export and pipelines | 13 and 14 |
+| Full seed with the volumes of the brief | 04 (`COPY` and batch inserts) |
+| Indexes and `EXPLAIN (ANALYZE, BUFFERS)` evidence on the full seed | 07 |
+| Roles with least privilege, parameterised queries | 09 |
+| Runbook with backup and restore commands, RTO and RPO | 10, and the `scripts/` folder of the session 17 example |
 
-**Deliverables.** `runbook.md` (the version after the drill) and `README.md` with, for each engine: the restore time (real RTO), the data lost (real RPO), the verification output, and the steps that were missing from the runbook.
+Write each document in `docs/` while you build the part it describes, and add an entry to `docs/ai-usage.md` each time an AI tool contributes something you keep or reject. Documents written in the last two days tend to miss decisions and describe code that has since changed, and the trainer grades both.
 
-**Done when.** All three engines were restored and verified, and the final runbook contains every step you had to add.
+#### 6. Split the work by flow, not by engine
+
+Every member must have non-trivial commits of their own in `postgres/`, `mongodb/`, `redis/` and `app/`, and loses 2 points for each area missing. Splitting by engine ("Ana does PostgreSQL, Rui does MongoDB, Marta does Redis") breaks that rule from the first day. Split by flow or feature, so that each piece of work goes through several engines. With the gym of the examples in `briefs/README.md`:
+
+| Member | First piece of work | Areas it touches |
+|--------|---------------------|------------------|
+| Ana | Book a class: migration with the capacity rule, endpoint, Redis occupancy counter | `postgres/`, `app/`, `redis/` |
+| Rui | Booking-attempt log: collection with validator and TTL index, written by the booking endpoint | `mongodb/`, `app/` |
+| Marta | Membership payments: migration, endpoint, report export of the payments | `postgres/`, `app/`, `mongodb/` |
+
+For the next piece, rotate, so that each member ends up working in the areas they have not touched yet. Check the split every week with the commands in [How the trainer checks](briefs/README.md#how-the-trainer-checks), not on the last day. Before the delivery, each member explains to the others the parts they did not write.
+
+#### 7. What to have done, and when
+
+- **End of session 17**: every member can start the project from a clean clone. The design (source-of-truth table, ER diagram, constraint for each rule, Redis keys) is agreed and committed. The migrations of the concurrent flow exist, and the naive version of one contested endpoint answers.
+- **Before session 18**: the concurrency test runs both scenarios in naive and in real mode. Every mandatory flow works with the small seed.
+- **End of session 18**: the full seed loads in under 5 minutes. The Redis rebuild and verify scripts pass. The pipelines, the `EXPLAIN` evidence and every document in `docs/` are done. Each member has commits in the four areas.
+- **Before session 19 starts**: every item of the [delivery checklist](briefs/README.md#delivery-checklist) is ticked and the SemVer tag is pushed.
+
+#### Integration and recovery
+
+Before the delivery, every engine must work together in the project's full flows, under load. Run the concurrency test against the integrated system (API plus all three engines), not only against SQL, and against both versions of the flow: the naive one must break the rule and the real one must hold it.
+
+A runbook is only useful if someone can follow it under pressure without the person who wrote it. The project runbook is not tested with a drill, but its commands must be correct, and its RTO (how long a restore may take) and RPO (how much data may be lost) must follow from what the business can accept. The session 17 example has backup, restore, verify and loss-simulation scripts: use them to rehearse the loss of a whole engine of your project on your own machine before you write the runbook.
 
 ---
 
-## Session 18: Cross-group review and documentation
+## Session 18: Review and documentation
 
 ### Theory
 
@@ -2895,109 +2927,6 @@ A useful review issue states the problem, where it is (file and line), why it ma
 
 Receiving a review: answer every issue. Fix it, or explain why you disagree. Close it with a link to the commit or pull request.
 
-### Tutorial
-
-Open an issue in the other group's repository using this structure:
-
-```markdown
-**Problem**
-The cache key for a user profile has no TTL when written by the admin endpoint.
-
-**Where**
-`app/admin/users.py:58`
-
-**Why it matters**
-Profiles edited by an admin are cached forever, so later changes never show up and memory grows without limit.
-
-**Suggestion**
-Set the same TTL as `get_profile()` does, or call that function instead of writing the key directly.
-```
-
-Work through the checklist above one item at a time, and open one issue per problem.
-
-For the issues you receive, create a branch per fix, reference the issue in the pull request (`Fixes #12`), and have another member review it before merging.
-
-Complete the `README.md` (how to run, stack, ER diagram, source-of-truth table, main decisions, authors and contributions, AI usage) and every file in `docs/`.
-
-### Exercise (group)
-
-Defined in the group project brief.
-
-### Challenge (optional, individual)
-
-Folder: `exercises/18-review/challenge/`
-
-**Goal.** Review database code and write issues that someone can fix without asking you questions.
-
-**Starting point.** Save this code as `app.py` in your challenge folder, exactly as shown, so that line numbers match. You do not need to run it.
-
-```python
-import os
-
-import psycopg
-import redis
-from fastapi import FastAPI
-from pymongo import MongoClient
-
-app = FastAPI()
-pg = psycopg.connect("postgresql://postgres:postgres@localhost:5432/pagila")
-r = redis.Redis(host="localhost", port=6379)
-mongo = MongoClient(os.environ["MONGO_URL"])["pagila_docs"]
-
-
-@app.get("/customers/search")
-def search(name: str):
-    return pg.execute(f"SELECT * FROM customer WHERE last_name = '{name}'").fetchall()
-
-
-@app.post("/login")
-def login(body: dict):
-    user = mongo.users.find_one({"email": body["email"], "password": body["password"]})
-    return {"ok": user is not None}
-
-
-@app.get("/films/{film_id}")
-def film(film_id: int):
-    cached = r.get(f"film:{film_id}")
-    if cached:
-        return cached
-    row = pg.execute("SELECT * FROM film WHERE film_id = %s", (film_id,)).fetchone()
-    r.set(f"film:{film_id}", str(row))
-    return row
-
-
-@app.post("/rentals/{rental_id}/pay")
-def pay(rental_id: int, amount: float):
-    balance = pg.execute(
-        "SELECT c.balance FROM customer c JOIN rental r USING (customer_id) WHERE r.rental_id = %s",
-        (rental_id,),
-    ).fetchone()[0]
-    pg.execute(
-        "UPDATE customer SET balance = %s WHERE customer_id = (SELECT customer_id FROM rental WHERE rental_id = %s)",
-        (balance - amount, rental_id),
-    )
-    pg.commit()
-    return {"balance": balance - amount}
-
-
-@app.get("/admin/clear-cache")
-def clear_cache():
-    for key in r.keys("*"):
-        r.delete(key)
-    return {"ok": True}
-```
-
-**Tasks.**
-
-1. Use the checklist in the theory of this session to find at least 8 problems in `app.py`. Look at security, concurrency, data types, caching and the use of each engine.
-2. Write one issue per problem in `issues.md`, using the structure of the tutorial: **Problem**, **Where** (`app.py:<line>`), **Why it matters** (a concrete failure, not a general statement) and **Suggestion**.
-3. Order the issues from most to least serious and justify the top 3.
-4. Write `app_fixed.py` with the fixes for your top 3 issues.
-
-**Deliverables.** `app.py`, `issues.md`, `app_fixed.py`.
-
-**Done when.** `issues.md` has at least 8 issues, each with a correct line number and a concrete failure, and `app_fixed.py` fixes the top 3 without introducing new problems.
-
 ---
 
 ## Session 19: Delivery and technical discussion
@@ -3009,42 +2938,6 @@ The technical discussion is not graded as a presentation. It checks that each st
 The questions follow the topics of the module: why a constraint or an index exists, what would happen with two simultaneous requests, what is lost if Redis disappears, how the backup is restored, why some data is embedded and other data referenced.
 
 The answers feed the individual modifier of the project mark (between −4 and +2).
-
-### Tutorial
-
-Prepare a 10-minute demonstration of your scenario's technical focus, with reproducible evidence:
-
-- Scenario A: the concurrency test running live, showing the rule holds.
-- Scenario B: `FLUSHALL` and the Redis rebuild, followed by the verification script passing.
-- Scenario C: `EXPLAIN (ANALYZE, BUFFERS)` before and after your indexes on the large tables, and the ranking under load.
-
-Rehearse it from a clean clone of the `v1.0` tag, so nothing depends on your local state.
-
-To prepare for the individual questions, each member explains to the others the parts they did not write, especially in the engine where they contributed least.
-
-### Exercise (group)
-
-Defined in the group project brief.
-
-### Challenge (optional, individual)
-
-Folder: `exercises/19-reproducibility/challenge/`
-
-**Goal.** Check that your exercises can be run by someone else, from a clean clone, with only your documentation.
-
-**Starting point.** Your fork with the exercises pushed, and a machine or a folder where the repository has never been run. If you use the same machine, stop the running containers and use a new folder; the Docker volumes are shared, so start with `./scripts/load-pagila.sh --reset` and recreate every database with `--reset`.
-
-**Tasks.**
-
-1. Clone your fork into the clean location.
-2. Following only the root `README.md` and the `README.md` of each exercise folder, run exercises 04, 09, 12 and 16 from scratch, timing each one.
-3. Write down every step you had to work out that is not documented: a missing command, a missing environment variable, a wrong path, a missing dependency. Each one is a documentation bug.
-4. Fix every bug in the READMEs, push, and tag the commit `exercises-v1`.
-5. Repeat tasks 1 and 2 from the tag and confirm that no step is missing.
-
-**Deliverables.** `README.md` in the challenge folder with the times of task 2, the list of documentation bugs with the commit that fixed each one, and the times of the second run.
-
-**Done when.** The second run from `exercises-v1` needs no step that is not written in the READMEs.
 
 ---
 
