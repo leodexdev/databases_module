@@ -36,3 +36,6 @@ exercises/01-database-engines/challenge/01_challenge.json
 
 
 exercises/08-security/exercise/api/venv/
+exercises/08-security/exercise/api/.env
+
+exercises/11-orm-n-plus-one/exercise/.env
